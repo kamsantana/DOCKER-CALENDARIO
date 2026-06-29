@@ -1,19 +1,92 @@
-name: CI/CD Deploy
+name: CI/CD Deploy - Calendario Full
 
 on:
   push:
     branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }} 
 
 jobs:
-  build:
+  build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
-    - name: Checkout del código
-      uses: actions/checkout@v4
+      # 1. Descargar el código del repositorio
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Construir la imagen Docker
-      run: |
-        docker build -t docker-calendario:latest .
+      # 2. Iniciar sesión en GitHub Container Registry (GHCR)
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 3. Generar las etiquetas (tags) automáticamente para el calendario
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=1.0.0
+            type=raw,value=latest
+
+      # 4. Construir la imagen y subirla a GHCR
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      # 5. Asegurar que la carpeta 'landinga' exista en el VPS
+      - name: Preparar directorio en el VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_SSH_PORT }}
+          script: |
+            echo "Preparando entorno..."
+            mkdir -p ~/landinga
+
+      # 6. Pasar archivos 'stack.yml' y 'Makefile' desde GitHub al VPS
+      - name: Pasar archivos desde Git al VPS
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_SSH_PORT }}
+          source: "stack.yml,Makefile"
+          target: "/home/${{ secrets.VPS_USER }}/landinga"
+
+      # 7. Ejecutar el despliegue final en el Docker Swarm del VPS
+      - name: Despliegue de los servicios en Swarm
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_SSH_PORT }}
+          script: |
+            echo "✅ Desplegando servicios del Calendario"
+            cd ~/landinga
+
+            echo "==> Iniciando sesión en GHCR..."
+            printf "%s" "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+            echo "==> Descargando la imagen actualizada..."
+            docker pull ghcr.io/kamsantana/docker-calendario:1.0.0
+
+            echo "==> Actualizando el stack en Swarm..."
+            docker stack deploy -c stack.yml docker-calendario
