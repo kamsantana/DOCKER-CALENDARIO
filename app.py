@@ -137,5 +137,4 @@ def home():
     )
 
 if __name__ == '__main__':
-    # Cambiado a 5005 para evitar conflictos de puertos en el VPS compartidos con Traefik
-    app.run(host='0.0.0.0', port=5005)
+    app.run(host='0.0.0.0', port=5000)
