@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  calendario:
+    # Cambia 'kamsantana' por tu usuario real de GitHub si es diferente
+    image: ghcr.io/kamsantana/docker-calendario:1.0.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      - traefik-public
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "traefik.enable=true"
+        # Configuración para HTTP (Puerto 80) e inyección de dominio
+        - "traefik.http.routers.calendario.entrypoints=web"
+        - "traefik.http.routers.calendario.rule=Host(`calendario.byronrm.com`)"
+        
+        # Redirección automática de HTTP a HTTPS
+        - "traefik.http.middlewares.calendario-https-redirect.redirectscheme.scheme=https"
+        - "traefik.http.routers.calendario.middlewares=calendario-https-redirect"
+        
+        # Configuración Segura HTTPS (Puerto 443) con certificados TLS
+        - "traefik.http.routers.calendario-secure.entrypoints=https"
+        - "traefik.http.routers.calendario-secure.rule=Host(`calendario.byronrm.com`)"
+        - "traefik.http.routers.calendario-secure.tls=true"
+        - "traefik.http.routers.calendario-secure.tls.certresolver=http"
+        - "traefik.http.routers.calendario-secure.service=calendario"
+        
+        # Puerto interno de tu app Flask dentro del contenedor
+        - "traefik.http.services.calendario.loadbalancer.server.port=5000"
+        - "traefik.docker.network=traefik-public"
+
+networks:
+  traefik-public:
+    external: true
+    name: traefik-public
