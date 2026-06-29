@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   calendario:
+    # Cambia 'kamsantana' por tu usuario real de GitHub si es diferente
     image: ghcr.io/kamsantana/docker-calendario:1.0.0
     build:
       context: .
@@ -19,7 +20,7 @@ services:
         - "traefik.enable=true"
         # Configuración para HTTP (Puerto 80) e inyección de dominio
         - "traefik.http.routers.calendario.entrypoints=web"
-        - "traefik.http.routers.calendario.rule=Host(`kevin.byronrm.com`)"
+        - "traefik.http.routers.calendario.rule=Host(`calendario.byronrm.com`)"
         
         # Redirección automática de HTTP a HTTPS
         - "traefik.http.middlewares.calendario-https-redirect.redirectscheme.scheme=https"
@@ -27,7 +28,7 @@ services:
         
         # Configuración Segura HTTPS (Puerto 443) con certificados TLS
         - "traefik.http.routers.calendario-secure.entrypoints=https"
-        - "traefik.http.routers.calendario-secure.rule=Host(`kevin.byronrm.com`)"
+        - "traefik.http.routers.calendario-secure.rule=Host(`calendario.byronrm.com`)"
         - "traefik.http.routers.calendario-secure.tls=true"
         - "traefik.http.routers.calendario-secure.tls.certresolver=http"
         - "traefik.http.routers.calendario-secure.service=calendario"
